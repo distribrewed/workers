@@ -1,8 +1,9 @@
 FROM distribrewed/core:x64
 
-ENV PLUGIN_DIR=/workers \
-    WORKER_PLUGIN_CLASS=TelegramWorker
+ENV PLUGIN_DIR=/workers
 
-COPY . ${PLUGIN_DIR}
+COPY requirements.txt ${TMP_DIR}/requirements.txt
+RUN pip install -r ${TMP_DIR}/requirements.txt && rm -rf ${TMP_DIR}/*
+
+COPY ./workers ${PLUGIN_DIR}
 WORKDIR ${PLUGIN_DIR}
-RUN pip install -r requirements.txt
