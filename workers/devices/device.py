@@ -12,6 +12,7 @@ DEVICE_PAUSE_CYCLE_TIME = 2.0
 class Device(threading.Thread):
     def __init__(self, owner=None):
         threading.Thread.__init__(self)
+        self.read_write_lock = threading.Lock()
         self.shutdown = False
         self.owner = owner
         self.name = None
@@ -19,7 +20,6 @@ class Device(threading.Thread):
         self.active = None
         self.cycle_time = None
         self.enabled = False
-        self.read_write_lock = threading.Lock()
         self.callback_name = None
         self.callback = None
 
