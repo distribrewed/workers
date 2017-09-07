@@ -3,6 +3,10 @@ services:
   - docker
 language: bash
 
+branches:
+  only:
+    - master
+
 jobs:
   include:
     - stage: Build x64 image
@@ -17,8 +21,8 @@ jobs:
       - docker build -t distribrewed/workers:arm -f Dockerfile.arm .
       - docker login -u="$DOCKER_USER" -p="$DOCKER_PASS"
       - docker push distribrewed/workers:arm
-    - stage: Test docker pull
-      script:
-      - docker run -t distribrewed/workers:x64 python --version
-      - docker run --rm --privileged multiarch/qemu-user-static:register --reset
-      - docker run -t distribrewed/workers:arm python --version
+#    - stage: Test docker pull
+#      script:
+#      - docker run -t distribrewed/workers:x64 python --version
+#      - docker run --rm --privileged multiarch/qemu-user-static:register --reset
+#      - docker run -t distribrewed/workers:arm python --version
