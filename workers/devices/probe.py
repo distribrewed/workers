@@ -1,10 +1,9 @@
 #!/usr/bin python
+import logging
+import os
 import time
 
 from workers.devices.device import Device, DEVICE_DEBUG_CYCLE_TIME
-import logging
-import os
-
 
 log = logging.getLogger(__name__)
 

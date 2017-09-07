@@ -1,8 +1,7 @@
 #!/usr/bin python
+import logging
 import threading
 import time
-import logging
-
 
 log = logging.getLogger(__name__)
 
