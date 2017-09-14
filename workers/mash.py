@@ -250,7 +250,7 @@ class DebugMashWorker(MashWorker):
                 if self.simulation:
                     self.test_temperature = self.current_temperature
                     measurement.debug_timer = self.debug_timer
-                    self.debug_timer += timedelta(seconds=MASH_DEBUG_TIMEDELTA)
+                    self.debug_timer += timedelta(seconds = self.MASH_DEBUG_TIMEDELTA)
                 else:
                     measurement.debug_timer = None
                 self.send_measurement(measurement)
