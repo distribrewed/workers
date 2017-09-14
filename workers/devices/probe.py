@@ -10,8 +10,8 @@ log = logging.getLogger(__name__)
 
 class Probe(Device):
 
-    def __init__(self, name, io, active, cycle_time, callback_name, callback, owner = None):
-        Device.__init__(self, name, io, active, cycle_time, callback_name, callback, owner)
+    def __init__(self, name, io, active, cycle_time, callback, owner = None):
+        Device.__init__(self, name, io, active, cycle_time, callback, owner)
         self.test_temperature = 0.0
 
     def init(self):

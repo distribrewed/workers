@@ -17,14 +17,10 @@ class BoilWorker(DeviceWorker):
     BOILER_IO =                 "BOILER_IO"
     BOILER_ACTIVE =             "BOILER_ACTIVE"
     BOILER_CYCLE_TIME =         "BOILER_CYCLE_TIME"
-    BOILER_CALLBACK_NAME =      "BOILER_CALLBACK_NAME"
-    BOILER_CALLBACK =           "BOILER_CALLBACK"
     THERMOMETER_NAME =           "THERMOMETER_NAME"
     THERMOMETER_IO =             "THERMOMETER_IO"
     THERMOMETER_ACTIVE =         "THERMOMETER_ACTIVE"
     THERMOMETER_CYCLE_TIME =     "THERMOMETER_CYCLE_TIME"
-    THERMOMETER_CALLBACK_NAME =  "THERMOMETER_CALLBACK_NAME"
-    THERMOMETER_CALLBACK =       "THERMOMETER_CALLBACK"
 
     def __init__(self):
         DeviceWorker.__init__(self)
@@ -48,44 +44,17 @@ class BoilWorker(DeviceWorker):
         boil_io = os.environ.get(self.BOILER_IO)
         boil_active = os.environ.get(self.BOILER_ACTIVE)
         boil_cycle_time = os.environ.get(self.BOILER_CYCLE_TIME)
-        boil_callback_name = os.environ.get(self.BOILER_CALLBACK_NAME)
-        boil_callback = os.environ.get(self.BOILER_CALLBACK)
-        boiler = SSR(boil_name, boil_io, boil_active, boil_cycle_time, boil_callback_name, boil_callback, self)
+        boil_callback = os.environ.get(self.boil_heating_callback)
+        boiler = SSR(boil_name, boil_io, boil_active, boil_cycle_time, boil_callback, self)
         self.add_device(boil_name, boiler)
 
-        therm_name = os.environ.get(self.BOILER_NAME)
-        therm_io = os.environ.get(self.BOILER_IO)
-        therm_active = os.environ.get(self.BOILER_ACTIVE)
-        therm_cycle_time = os.environ.get(self.BOILER_CYCLE_TIME)
-        therm_callback_name = os.environ.get(self.BOILER_CALLBACK_NAME)
-        therm_callback = os.environ.get(self.BOILER_CALLBACK)
-        thermometer = Probe(boil_name, boil_io, boil_active, boil_cycle_time, boil_callback_name, boil_callback, self)
+        therm_name = os.environ.get(self.THERMOMETER_NAME)
+        therm_io = os.environ.get(self.THERMOMETER_IO)
+        therm_active = os.environ.get(self.THERMOMETER_ACTIVE)
+        therm_cycle_time = os.environ.get(self.THERMOMETER_CYCLE_TIME)
+        therm_callback = os.environ.get(self.boil_temperature_callback())
+        thermometer = Probe(therm_name, therm_io, therm_active, therm_cycle_time, therm_callback, self)
         self.add_device(therm_name, thermometer)
-
-    def is_done(self):
-        if self.hold_timer is None:
-            return False
-        finish = self.finish_time()
-        if finish is None:
-            return False
-        work = self.work_time()
-        if work is None:
-            return False
-        if finish >= work:
-            return True
-        log.debug('Time until work done: {0}'.format(work - finish), True)
-        return False
-
-    def finish(self):
-        try:
-            self.pause_all_devices()
-            self.working = False
-            self.done()
-            self.session_detail_id = 0
-            return True
-        except Exception as e:
-            log.error('Error in cleaning up after work: {0}'.format(e.args[0]), True)
-            return False
 
     def start_worker(self, shedule):
         log.debug('Starting {0}'.format(self), True)
@@ -134,7 +103,8 @@ class BoilWorker(DeviceWorker):
             self.current_temperature = measured_value
             therm = self.get_device(self.thermometer_name)
             measurement = {}
-            measurement["device"] = therm.name
+            measurement["name"] = self.name
+            measurement["device_name"] = therm.name
             measurement["value"] = self.current_temperature
             measurement["set_point"] = self.current_set_temperature
             if self.hold_timer is None:
@@ -161,7 +131,9 @@ class BoilWorker(DeviceWorker):
         try:
             log.debug('{0} reports heating time of {1} seconds'.format(self.name, heating_time))
             boiler = self.devices[self.boiler_name]
-            measurement = self.generate_worker_measurement(self, boiler)
+            measurement = {}
+            measurement["name"] = self.name
+            measurement["device_name"] = boiler.name
             measurement["value"] = heating_time
             measurement["set_point"] = boiler.cycle_time
             if self.hold_timer is None:
@@ -193,6 +165,7 @@ class DebugBoilWorker(BoilWorker):
     def __init__(self, name):
         BoilWorker.__init__(self, name)
         self.test_temperature = self.BOIL_DEBUG_INIT_TEMP
+        self.debug_timer = None
 
     def start_worker(self, shedule):
         log.debug('Starting {0}'.format(self), True)
@@ -225,7 +198,8 @@ class DebugBoilWorker(BoilWorker):
             self.current_temperature = measured_value
             therm = self.get_device(self.thermometer_name)
             measurement = {}
-            measurement["device"] = therm.name
+            measurement["name"] = self.name
+            measurement["device_name"] = therm.name
             measurement["value"] = self.current_temperature
             measurement["set_point"] = self.current_set_temperature
             if self.hold_timer is None:
@@ -256,6 +230,8 @@ class DebugBoilWorker(BoilWorker):
             log.debug('{0} reports heating time of {1} seconds'.format(self.name, heating_time))
             boiler = self.devices[self.boiler_name]
             measurement = {}
+            measurement["name"] = self.name
+            measurement["device_name"] = boiler.name
             measurement["value"] = heating_time
             if self.hold_timer is None:
                 measurement["work"] = 'Bringing to boil'

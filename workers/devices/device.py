@@ -10,14 +10,13 @@ DEVICE_DEBUG_CYCLE_TIME = 1.0
 DEVICE_PAUSE_CYCLE_TIME = 2.0
 
 class Device(threading.Thread):
-    def __init__(self, name, io, active, cycle_time, callback_name, callback, owner = None):
+    def __init__(self, name, io, active, cycle_time, callback, owner = None):
         threading.Thread.__init__(self)
         self.name = name
         self.io = io
         self.active = active
         self.cycle_time = cycle_time
-        self.callback_name = callback_name
-        self.callback = self.callback
+        self.callback = callback
         self.owner = owner
         self.read_write_lock = threading.Lock()
         self.shutdown = False
@@ -42,10 +41,6 @@ class Device(threading.Thread):
     def run_device(self):
         if self.enabled:
             return
-        if hasattr(self.owner, self.callback_name):
-            self.callback = getattr(self.owner, self.callback_name)
-        else:
-            log.error('Callback function {0} not found for owner {1}'.format(self.callback_name, self.owner))
         self.auto_setup()
         self.start()
 
