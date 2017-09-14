@@ -29,42 +29,42 @@ class DeviceWorker(BaseWorker):
     def add_devices(self):
         pass
 
-    def add_device(self, name, device):
+    def _add_device(self, name, device):
         self.inputs[name] = device
 
-    def get_device(self, name):
+    def _get_device(self, name):
         return self.devices[name]
 
-    def start_all_devices(self):
+    def _start_all_devices(self):
         for device in self.devices.values:
             device.run_device()
         return
 
-    def is_any_device_enabled(self):
+    def _is_any_device_enabled(self):
         for device in self.devices.values():
             if device.enabled:
                 return True
         return False
 
-    def is_device_enabled(self, name):
+    def _is_device_enabled(self, name):
         if len(self.devices) != 0:
             if self.devices[name].enabled:
                 return True
         return False
 
-    def pause_all_devices(self):
+    def _pause_all_devices(self):
         if self.pausing_all_devices:
             return
-        self.pausing_all_devices = True
-        while self.is_any_device_enabled():
+        self._pausing_all_devices = True
+        while self._is_any_device_enabled():
             log.debug('Trying to pause all passive devices...')
             for device in self.devices.values():
                 device.pause_device()
             time.sleep(1)
         log.debug('All passive devices paused')
-        self.pausing_all_devices = False
+        self._pausing_all_devices = False
 
-    def resume_all_devices(self):
+    def _resume_all_devices(self):
         while self.pausing_all_devices:
             time.sleep(1)
         log.debug('Resuming all passive devices...')
@@ -73,12 +73,12 @@ class DeviceWorker(BaseWorker):
         log.debug('All passive devices resumed')
         self.pausing_all_devices = False
 
-    def stop_all_devices(self):
+    def _stop_all_devices(self):
         for device in self.devices.values():
             device.stop_device()
 
-    def send_measurement(self, worker_measurement):
-        pass # send to prometheus
+    def _send_measurement(self, worker_measurement):
+        pass # TODO: send to prometheus
 
     def start_worker(self, shcedule):
         pass

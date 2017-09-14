@@ -39,12 +39,12 @@ class BoilWorker(DeviceWorker):
         self.current_temperature = 0.0
         self.current_set_temperature = 0.0
 
-    def add_devices(self):
+    def _add_devices(self):
         boil_name = os.environ.get(self.BOILER_NAME)
         boil_io = os.environ.get(self.BOILER_IO)
         boil_active = os.environ.get(self.BOILER_ACTIVE)
         boil_cycle_time = os.environ.get(self.BOILER_CYCLE_TIME)
-        boil_callback = os.environ.get(self.boil_heating_callback)
+        boil_callback = os.environ.get(self._boil_heating_callback)
         boiler = SSR(boil_name, boil_io, boil_active, boil_cycle_time, boil_callback, self)
         self.add_device(boil_name, boiler)
 
@@ -52,9 +52,32 @@ class BoilWorker(DeviceWorker):
         therm_io = os.environ.get(self.THERMOMETER_IO)
         therm_active = os.environ.get(self.THERMOMETER_ACTIVE)
         therm_cycle_time = os.environ.get(self.THERMOMETER_CYCLE_TIME)
-        therm_callback = os.environ.get(self.boil_temperature_callback())
+        therm_callback = os.environ.get(self._boil_temperature_callback())
         thermometer = Probe(therm_name, therm_io, therm_active, therm_cycle_time, therm_callback, self)
         self.add_device(therm_name, thermometer)
+
+    def is_done(self):
+        if self.hold_timer is None:
+            return False
+        finish = self.finish_time()
+        if finish is None:
+            return False
+        work = self.work_time()
+        if work is None:
+            return False
+        if finish >= work:
+            return True
+        log.debug('Time until work done: {0}'.format(work - finish), True)
+        return False
+
+    def _finish(self):
+        try:
+            self._pause_all_devices()
+            self.working = False
+            return True
+        except Exception as e:
+            log.error('Error in cleaning up after work: {0}'.format(e.args[0]), True)
+            return False
 
     def start_worker(self, shedule):
         log.debug('Starting {0}'.format(self), True)
@@ -66,42 +89,42 @@ class BoilWorker(DeviceWorker):
             self.pause_time = timedelta(seconds=0)
         except Exception as e:
             log.debug('Boil worker failed to start work: {0}'.format(e.args[0]))
-            self.stop_all_devices()
+            self._stop_all_devices()
             return
-        self.pause_all_devices()
+        self._pause_all_devices()
         self.current_set_temperature = float(shedule["target"])
         self.hold_timer = None
         self.hold_pause_timer = None
         seconds = float(shedule.hold_time) * float(shedule.time_unit_seconds)
         self.current_hold_time = timedelta(seconds=seconds)
-        cycle_time = float(self.get_device[self.thermometer_name].cycle_time)
-        self.resume_all_devices()
+        cycle_time = float(self._get_device[self.thermometer_name].cycle_time)
+        self._resume_all_devices()
         return True
 
     def stop_worker(self):
-        self.get_device[self.boiler_name].write(0.0)
-        self.stop_all_devices()
+        self._get_device[self.boiler_name].write(0.0)
+        self._stop_all_devices()
         self.enabled = False
         return True
 
     def pause_worker(self):
         log.debug('Pause {0}'.format(self), True)
-        self.pause_all_devices()
+        self._pause_all_devices()
         self.hold_pause_timer = time.now()
         return True
 
     def resume_worker(self):
         log.info('Resume {0}'.format(self), True)
         self.pause_time += (time.now() - self.hold_pause_timer)
-        self.resume_all_devices()
+        self._resume_all_devices()
         return True
 
-    def boil_temperature_callback(self, measured_value):
+    def _boil_temperature_callback(self, measured_value):
         try:
             calc = 1.0
             log.debug('{0} reports measured value {1}'.format(self.name, measured_value))
             self.current_temperature = measured_value
-            therm = self.get_device(self.thermometer_name)
+            therm = self._get_device(self.thermometer_name)
             measurement = {}
             measurement["name"] = self.name
             measurement["device_name"] = therm.name
@@ -112,25 +135,24 @@ class BoilWorker(DeviceWorker):
                 measurement["remaining"] = '{:.2f}'.format(self.current_temperature)
             else:
                 measurement["work"] = 'Boiling left'
-                measurement["remaining"] = self.remaining_time_info()
-            self.send_measurement(measurement)
+            self._send_measurement(measurement)
             # Failsafe - start hold timer at 99.0 if reaching 100.0 is difficult
             # due to thermal sensor placement
             if self.working and self.hold_timer is None and \
                     (measured_value >= self.current_set_temperature or measured_value >= 99.0):
                 self.hold_timer = time.now()
             if self.is_done():
-                self.finish()
+                self._finish()
             else:
-                self.get_device[self.boiler_name].write(calc)
+                self._get_device[self.boiler_name].write(calc)
         except Exception as e:
             log.error('Boil worker unable to react to temperature update, shutting down: {0}'.format(e.args[0]))
-            self.stop_all_devices()
+            self._stop_all_devices()
 
-    def boil_heating_callback(self, heating_time):
+    def _boil_heating_callback(self, heating_time):
         try:
             log.debug('{0} reports heating time of {1} seconds'.format(self.name, heating_time))
-            boiler = self.devices[self.boiler_name]
+            boiler = self._get_devices[self.boiler_name]
             measurement = {}
             measurement["name"] = self.name
             measurement["device_name"] = boiler.name
@@ -145,10 +167,10 @@ class BoilWorker(DeviceWorker):
                     self.current_temperature,
                     self.current_set_temperature,
                     self.current_temperature - self.current_set_temperature)
-            self.send_measurement(measurement)
+            self._send_measurement(measurement)
         except Exception as e:
             log.error('Boil worker unable to react to heating update, shutting down: {0}'.format(e.args[0]))
-            self.stop_all_devices()
+            self._stop_all_devices()
 
 
 class DebugBoilWorker(BoilWorker):
@@ -162,8 +184,8 @@ class DebugBoilWorker(BoilWorker):
     BOIL_DEBUG_TIME_DIVIDER = 60
     BOIL_DEBUG_TIMEDELTA = 10  # seconds
 
-    def __init__(self, name):
-        BoilWorker.__init__(self, name)
+    def __init__(self):
+        BoilWorker.__init__(self)
         self.test_temperature = self.BOIL_DEBUG_INIT_TEMP
         self.debug_timer = None
 
@@ -177,26 +199,26 @@ class DebugBoilWorker(BoilWorker):
             self.pause_time = timedelta(seconds=0)
         except Exception as e:
             log.debug('Boil worker failed to start work: {0}'.format(e.args[0]))
-            self.stop_all_devices()
+            self._stop_all_devices()
             return
-        self.pause_all_devices()
+        self._pause_all_devices()
         self.current_set_temperature = float(shedule["target"])
         self.hold_timer = None
         self.hold_pause_timer = None
         seconds = float(shedule.hold_time) * float(shedule.time_unit_seconds)
         seconds /= self.BOIL_DEBUG_TIME_DIVIDER
-        self.get_device[self.thermometer_name].test_temperature = self.BOIL_DEBUG_INIT_TEMP
+        self._get_device[self.thermometer_name].test_temperature = self.BOIL_DEBUG_INIT_TEMP
         self.current_hold_time = timedelta(seconds=seconds)
-        cycle_time = float(self.get_device[self.thermometer_name].cycle_time)
-        self.resume_all_devices()
+        cycle_time = float(self._get_device[self.thermometer_name].cycle_time)
+        self._resume_all_devices()
         return True
 
-    def boil_temperature_callback(self, measured_value):
+    def _boil_temperature_callback(self, measured_value):
         try:
             calc = 1.0
             log.debug('{0} reports measured value {1}'.format(self.name, measured_value))
             self.current_temperature = measured_value
-            therm = self.get_device(self.thermometer_name)
+            therm = self._get_device(self.thermometer_name)
             measurement = {}
             measurement["name"] = self.name
             measurement["device_name"] = therm.name
@@ -207,28 +229,27 @@ class DebugBoilWorker(BoilWorker):
                 measurement["remaining"] = '{:.2f}'.format(self.current_temperature)
             else:
                 measurement["work"] = 'Boiling left'
-                measurement["remaining"] = self.remaining_time_info()
             self.test_temperature = self.current_temperature
             measurement["debug_timer"] = self.debug_timer
             self.debug_timer += timedelta(seconds = self.BOIL_DEBUG_TIMEDELTA)
-            self.send_measurement(measurement)
+            self._send_measurement(measurement)
             # Failsafe - start hold timer at 99.0 if reaching 100.0 is difficult
             # due to thermal sensor placement
             if self.working and self.hold_timer is None and \
                     (measured_value >= self.current_set_temperature or measured_value >= 99.0):
                 self.hold_timer = time.now()
             if self.is_done():
-                self.finish()
+                self._finish()
             else:
-                self.get_device[self.boiler_name].write(calc)
+                self._get_device[self.boiler_name].write(calc)
         except Exception as e:
             log.error('Boil worker unable to react to temperature update, shutting down: {0}'.format(e.args[0]))
-            self.stop_all_devices()
+            self._stop_all_devices()
 
-    def boil_heating_callback(self, heating_time):
+    def _boil_heating_callback(self, heating_time):
         try:
             log.debug('{0} reports heating time of {1} seconds'.format(self.name, heating_time))
-            boiler = self.devices[self.boiler_name]
+            boiler = self._get_device[self.boiler_name]
             measurement = {}
             measurement["name"] = self.name
             measurement["device_name"] = boiler.name
@@ -243,7 +264,7 @@ class DebugBoilWorker(BoilWorker):
                     self.current_set_temperature,
                     self.current_temperature - self.current_set_temperature)
             measurement["debug_timer"] = self.debug_timer
-            self.send_measurement(measurement)
+            self._send_measurement(measurement)
             try:
                 self.devices[self.thermometer_name].test_temperature = \
                     PID.calc_heating(self.current_temperature,
@@ -258,4 +279,4 @@ class DebugBoilWorker(BoilWorker):
                 log.debug('Boil worker unable to update test temperature for debug: {0}'.format(e.args[0]))
         except Exception as e:
             log.error('Boil worker unable to react to heating update, shutting down: {0}'.format(e.args[0]))
-            self.stop_all_devices()
+            self._stop_all_devices()

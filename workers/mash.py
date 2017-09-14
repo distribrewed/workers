@@ -46,7 +46,7 @@ class MashWorker(DeviceWorker):
         mash_io = os.environ.get(self.MASH_IO)
         mash_active = os.environ.get(self.MASH_ACTIVE)
         mash_cycle_time = os.environ.get(self.MASH_CYCLE_TIME)
-        mash_callback = os.environ.get(self.mash_heating_callback)
+        mash_callback = os.environ.get(self._mash_heating_callback)
         mash = SSR(mash_name, mash_io, mash_active, mash_cycle_time, mash_callback, self)
         self.add_device(mash_name, mash)
 
@@ -54,7 +54,7 @@ class MashWorker(DeviceWorker):
         therm_io = os.environ.get(self.THERMOMETER_IO)
         therm_active = os.environ.get(self.THERMOMETER_ACTIVE)
         therm_cycle_time = os.environ.get(self.THERMOMETER_CYCLE_TIME)
-        therm_callback = os.environ.get(self.mash_temperature_callback())
+        therm_callback = os.environ.get(self._mash_temperature_callback())
         thermometer = Probe(therm_name, therm_io, therm_active, therm_cycle_time, therm_callback, self)
         self.add_device(therm_name, thermometer)
 
@@ -72,19 +72,14 @@ class MashWorker(DeviceWorker):
         log.debug('Time until work done: {0}'.format(work - finish), True)
         return False
 
-    def finish(self):
+    def _finish(self):
         try:
             self.pause_all_devices()
             self.working = False
-            self.done()
-            self.session_detail_id = 0
             return True
         except Exception as e:
             log.error('Error in cleaning up after work: {0}'.format(e.args[0]), True)
             return False
-
-    def on_start(self):
-        log.debug('Waiting for mash schedule. To exit press CTRL+C', True)
 
     def start_worker(self, shedule):
         try:
@@ -95,40 +90,40 @@ class MashWorker(DeviceWorker):
             self.pause_time = timedelta(seconds=0)
         except Exception as e:
             log.debug('Mash worker failed to start work: {0}'.format(e.args[0]))
-            self.stop_all_devices()
+            self._stop_all_devices()
             return
-        self.pause_all_devices()
+        self._pause_all_devices()
         self.current_set_temperature = float(shedule["target"])
         self.hold_timer = None
         self.hold_pause_timer = None
         seconds = float(shedule["hold_time"]) * float(shedule["time_unit_seconds"])
         self.current_hold_time = timedelta(seconds=seconds)
-        cycle_time = float(self.get_device[self.thermometer_name].cycle_time)
+        cycle_time = float(self._get_device[self.thermometer_name].cycle_time)
         if self.pid is None:
             self.pid = PID(None, self.current_set_temperature, cycle_time)
         else:
             self.pid = PID(self.pid.pid_params, self.current_set_temperature, cycle_time)
-        self.resume_all_devices()
+        self._resume_all_devices()
 
     def stop_worker(self):
-        self.get_device[self.mash_name].write(0.0)
-        self.stop_all_devices()
+        self._get_device[self.mash_name].write(0.0)
+        self._stop_all_devices()
         self.enabled = False
         return True
 
     def pause_worker(self):
         log.debug('Pause {0}'.format(self), True)
-        self.pause_all_devices()
+        self._pause_all_devices()
         self.hold_pause_timer = time.now()
         return True
 
     def resume_worker(self):
         log.info('Resume {0}'.format(self), True)
         self.pause_time += (time.now() - self.hold_pause_timer)
-        self.resume_all_devices()
+        self._resume_all_devices()
         return True
 
-    def mash_temperature_callback(self, measured_value):
+    def _mash_temperature_callback(self, measured_value):
         try:
             calc = 0.0
             if self.pid is not None:
@@ -140,7 +135,7 @@ class MashWorker(DeviceWorker):
             self.current_temperature = measured_value
             measurement = {}
             measurement["name"] = self.name
-            measurement["device_name"] = self.get_device(self.thermometer_name).name
+            measurement["device_name"] = self._get_device(self.thermometer_name).name
             measurement["value"] = self.current_temperature
             measurement["set_point"] = self.current_set_temperature
             if self.hold_timer is None:
@@ -148,22 +143,21 @@ class MashWorker(DeviceWorker):
                 measurement["remaining"] = '{:.2f}'.format(self.current_temperature)
             else:
                 measurement["work"] = 'Mashing'
-                measurement["remaining"] = self.remaining_time_info()
             self.send_measurement(measurement)
             if self.working and self.hold_timer is None and measured_value >= self.current_set_temperature:
                 self.hold_timer = time.now()
             if self.is_done():
-                self.finish()
+                self._finish()
             elif self.pid is not None:
-                self.get_device[self.mash_name].write(calc)
+                self._get_device[self.mash_name].write(calc)
         except Exception as e:
             log.error('Mash worker unable to react to temperature update, shutting down: {0}'.format(e.args[0]))
-            self.stop_all_devices()
+            self._stop_all_devices()
 
-    def mash_heating_callback(self, heating_time):
+    def _mash_heating_callback(self, heating_time):
         try:
             log.debug('{0} reports heating time of {1} seconds'.format(self.name, heating_time))
-            mash = self.get_device[self.mash_name] # type: SSR
+            mash = self._get_device[self.mash_name] # type: SSR
             measurement = {}
             measurement["name"] = self.name
             measurement["device_name"] = mash.name
@@ -178,10 +172,10 @@ class MashWorker(DeviceWorker):
                     self.current_temperature,
                     self.current_set_temperature,
                     (self.current_temperature - self.current_set_temperature))
-            self.send_measurement(measurement)
+            self._send_measurement(measurement)
         except Exception as e:
             log.error('Mash worker unable to react to heating update, shutting down: {0}'.format(e.args[0]))
-            self.stop_all_devices()
+            self._stop_all_devices()
 
 
 class DebugMashWorker(MashWorker):
@@ -209,24 +203,24 @@ class DebugMashWorker(MashWorker):
             self.pause_time = timedelta(seconds=0)
         except Exception as e:
             log.debug('Mash worker failed to start work: {0}'.format(e.args[0]))
-            self.stop_all_devices()
+            self._stop_all_devices()
             return
-        self.pause_all_devices()
+        self._pause_all_devices()
         self.current_set_temperature = float(shedule["target"])
         self.hold_timer = None
         self.hold_pause_timer = None
         seconds = float(shedule["hold_time"]) * float(shedule["time_unit_seconds"])
         seconds /= self.MASH_DEBUG_TIME_DIVIDER
-        self.get_device[self.thermometer_name].test_temperature = self.MASH_DEBUG_INIT_TEMP
+        self._get_device[self.thermometer_name].test_temperature = self.MASH_DEBUG_INIT_TEMP
         self.current_hold_time = timedelta(seconds=seconds)
-        cycle_time = float(self.get_device[self.thermometer_name].cycle_time)
+        cycle_time = float(self._get_device[self.thermometer_name].cycle_time)
         if self.pid is None:
             self.pid = PID(None, self.current_set_temperature, cycle_time)
         else:
             self.pid = PID(self.pid.pid_params, self.current_set_temperature, cycle_time)
-        self.resume_all_devices()
+        self._resume_all_devices()
 
-        def mash_temperature_callback(self, measured_value):
+        def _mash_temperature_callback(self, measured_value):
             try:
                 calc = 0.0
                 if self.pid is not None:
@@ -253,18 +247,18 @@ class DebugMashWorker(MashWorker):
                     self.debug_timer += timedelta(seconds = self.MASH_DEBUG_TIMEDELTA)
                 else:
                     measurement.debug_timer = None
-                self.send_measurement(measurement)
+                self._send_measurement(measurement)
                 if self.working and self.hold_timer is None and measured_value >= self.current_set_temperature:
                     self.hold_timer = time.now()
                 if self.is_done():
-                    self.finish()
+                    self._finish()
                 elif self.pid is not None:
                     self.get_device[self.mash_name].write(calc)
             except Exception as e:
                 log.error('Mash worker unable to react to temperature update, shutting down: {0}'.format(e.args[0]))
-                self.stop_all_devices()
+                self._stop_all_devices()
 
-        def mash_heating_callback(self, heating_time):
+        def _mash_heating_callback(self, heating_time):
             try:
                 log.debug('{0} reports heating time of {1} seconds'.format(self.name, heating_time))
                 mash = self.get_device[self.mash_name]  # type: SSR
@@ -286,7 +280,7 @@ class DebugMashWorker(MashWorker):
                     measurement.debug_timer = self.debug_timer
                 else:
                     measurement.debug_timer = None
-                self.send_measurement(measurement)
+                self._send_measurement(measurement)
                 if self.simulation:
                     try:
                         self.get_device[self.thermometer_name].test_temperature = \
@@ -302,4 +296,4 @@ class DebugMashWorker(MashWorker):
                         log.debug('Mash worker unable to update test temperature for debug: {0}'.format(e.args[0]))
             except Exception as e:
                 log.error('Mash worker unable to react to heating update, shutting down: {0}'.format(e.args[0]))
-                self.stop_all_devices()
+                self._stop_all_devices()
