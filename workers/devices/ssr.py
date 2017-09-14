@@ -11,23 +11,10 @@ log = logging.getLogger(__name__)
 
 class SSR(Device):
 
-    NAME =          "DEVICE_SSR_NAME"
-    IO =            "DEVICE_SSR_IO"
-    ACTIVE =        "DEVICE_SSR_ACTIVE"
-    CYCLE_TIME =    "DEVICE_SSR_CYCLE_TIME"
-    CALLBACK_NAME = "DEVICE_SSR_CALLBACK_NAME"
-    CALLBACK =      "DEVICE_SSR_CALLBACK"
-
-    def __init__(self, owner=None):
+    def __init__(self, name, io, active, cycle_time, callback_name, callback, owner = None):
+        Device.__init__(self, name, io, active, cycle_time, callback_name, callback, owner)
         self.on_percent = 0.0
         self.last_on_time = 0.0
-        Device.__init__(self, owner)
-        self.name = os.environ.get(self.NAME)
-        self.io = os.environ.get(self.IO)
-        self.active = os.environ.get(self.ACTIVE)
-        self.cycle_time = os.environ.get(self.CYCLE_TIME)
-        self.callback_name = os.environ.get(self.CALLBACK_NAME)
-        self.callback = os.environ.get(self.CALLBACK)
 
     def init(self):
         pass

@@ -1,266 +1,66 @@
-#import logging
-
-#from distribrewed_core.base.worker import BaseWorker
-
-#log = logging.getLogger(__name__)
-
-#class BoilWorker(BaseWorker):
-#    def __init__(self):
-#        super(BoilWorker, self).__init__()
-#        log.info('Finson......take it away!')
-
-#    def startboil(self, level):
-#        log.info('Lets {0} boil!'.format(level))
-#        self.call_master_method("message", args=["giggidy"])
-
 #!/usr/bin python
-import threading
+import os
 import time
-from django.core import serializers
-from django.utils import timezone as dt
 from datetime import timedelta as timedelta
-from core.defaults import *
-from core.messages import *
-from core.utils.coreutils import *
-from core.workers.worker_measurement import WorkerMeasurement
-import core.utils.logging as log
-from core.comm.connection import WorkerConnection
+from prometheus_client import Counter
+import logging
+from device import DeviceWorker
+from devices.probe import Probe
+from devices.ssr import SSR
+from utils.pid import PID
 
+log = logging.getLogger(__name__)
 
-MessageFunctions = (MessageInfo,
-                    MessagePause,
-                    MessageResume,
-                    MessageReset,
-                    MessageStop)
+class BoilWorker(DeviceWorker):
 
+    BOILER_NAME =               "BOILER_NAME"
+    BOILER_IO =                 "BOILER_IO"
+    BOILER_ACTIVE =             "BOILER_ACTIVE"
+    BOILER_CYCLE_TIME =         "BOILER_CYCLE_TIME"
+    BOILER_CALLBACK_NAME =      "BOILER_CALLBACK_NAME"
+    BOILER_CALLBACK =           "BOILER_CALLBACK"
+    THERMOMETER_NAME =           "THERMOMETER_NAME"
+    THERMOMETER_IO =             "THERMOMETER_IO"
+    THERMOMETER_ACTIVE =         "THERMOMETER_ACTIVE"
+    THERMOMETER_CYCLE_TIME =     "THERMOMETER_CYCLE_TIME"
+    THERMOMETER_CALLBACK_NAME =  "THERMOMETER_CALLBACK_NAME"
+    THERMOMETER_CALLBACK =       "THERMOMETER_CALLBACK"
 
-class BaseWorker(threading.Thread):
-    def __init__(self, name):
-        threading.Thread.__init__(self)
+    def __init__(self):
+        DeviceWorker.__init__(self)
         self.working = False
-        self.name = name
         self.simulation = False
-        self.ip = MessageServerIP
-        self.master_port = 0
-        self.worker_port = 0
-        self.input_config = None
-        self.output_config = None
-        self.outputs = {}
-        self.inputs = {}
         self.schedule = None
         self.enabled = False
         self.active = False
-        self.pausing_all_devices = False
         self.current_hold_time = timedelta(minutes=0)
         self.hold_timer = None
         self.hold_pause_timer = None
         self.pause_time = 0.0
-        self.debug_timer = dt.now()
         self.session_detail_id = 0
-        self.connection = None
+        self.boiler_name = os.environ.get(self.BOILER_NAME)
+        self.thermometer_name = os.environ.get(self.THERMOMETER_NAME)
+        self.current_temperature = 0.0
+        self.current_set_temperature = 0.0
 
-    def __str__(self):
-        return 'Worker - [name:{0}, type:{1}, out:{2}, in:{3}]'. \
-            format(self.name, str(self.__class__.__name__), len(self.output_config), len(self.input_config))
+    def add_devices(self):
+        boil_name = os.environ.get(self.BOILER_NAME)
+        boil_io = os.environ.get(self.BOILER_IO)
+        boil_active = os.environ.get(self.BOILER_ACTIVE)
+        boil_cycle_time = os.environ.get(self.BOILER_CYCLE_TIME)
+        boil_callback_name = os.environ.get(self.BOILER_CALLBACK_NAME)
+        boil_callback = os.environ.get(self.BOILER_CALLBACK)
+        boiler = SSR(boil_name, boil_io, boil_active, boil_cycle_time, boil_callback_name, boil_callback, self)
+        self.add_device(boil_name, boiler)
 
-    def init_communication(self, ip, master_port, worker_port):
-        self.ip = ip
-        self.master_port = master_port
-        self.worker_port = worker_port
-        self.connection = WorkerConnection(self.ip, self.master_port, self.worker_port, self.name)
-
-    def create_device_threads(self):
-        for i in self.input_config:
-            device = core.utils.coreutils.load_device(i, self, self.simulation)
-            if device is None:
-                return False
-            device.run_device()
-            self.inputs[i.name] = device
-        for o in self.output_config:
-            device = core.utils.coreutils.load_device(o, self, self.simulation)
-            if device is None:
-                return False
-            self.outputs[o.name] = device
-            device.run_device()
-        return True
-
-    def start_all_devices(self):
-        for i in self.inputs.values():
-            self.inputs[i.name] = i.start_device()
-        for o in self.outputs.values():
-            self.outputs[o.name] = o.start_device()
-
-    def is_any_device_enabled(self):
-        for i in self.inputs.values():
-            if i.enabled:
-                return True
-        for o in self.outputs.values():
-            if o.enabled:
-                return True
-        return False
-
-    def is_device_enabled(self, name):
-        if len(self.inputs) != 0:
-            if self.inputs[name].enabled:
-                return True
-        if len(self.outputs) != 0:
-            if self.outputs[name].enabled:
-                return True
-        return False
-
-    def pause_all_devices(self):
-        if self.pausing_all_devices:
-            return
-        self.pausing_all_devices = True
-        while self.is_any_device_enabled():
-            log.debug('Trying to pause all passive devices...')
-            for i in self.inputs.values():
-                i.pause_device()
-            for o in self.outputs.values():
-                o.pause_device()
-            time.sleep(1)
-        log.debug('All passive devices paused')
-        self.pausing_all_devices = False
-
-    def resume_all_devices(self):
-        while self.pausing_all_devices:
-            time.sleep(1)
-        log.debug('Resuming all passive devices...')
-        for i in self.inputs.values():
-            i.resume_device()
-        for o in self.outputs.values():
-            o.resume_device()
-        log.debug('All passive devices resumed')
-        self.pausing_all_devices = False
-
-    def stop_all_devices(self):
-        for i in self.inputs.values():
-            i.stop_device()
-        for o in self.outputs.values():
-            o.stop_device()
-
-    def work(self, data):
-        pass
-
-    def run(self):
-        if not self.create_device_threads():
-            log.error('Unable to load all devices, shutting down', True)
-        self.info()
-        self.listen()
-
-    def listen(self):
-        self.enabled = True
-        self.on_start()
-        while self.enabled:
-            log.debug("worker is listening", True)
-            data = self.connection.check()
-            if data is not None:
-                self.receive(data)
-            time.sleep(0)
-        log.debug('Shutting down worker {0}'.format(self), True)
-
-    def stop(self):
-        self.stop_all_devices()
-        self.on_stop()
-        self.enabled = False
-
-    def send_to_master(self, data):
-        #log.debug('Sending to master - ' + data + " " + str(self.ip) + ":" + str(self.port), True)
-        self.connection.send(data)
-
-    def send_measurement(self, worker_measurement):
-        message = WorkerMeasurement.serialize_message(worker_measurement)
-        if message is None:
-            return
-        self.send_to_master(message)
-
-    @staticmethod
-    def generate_worker_measurement(worker, device):
-        return WorkerMeasurement(worker.session_detail_id, worker.name, device.name)
-
-    def work_time(self):
-        if self.current_hold_time is None:
-            return None
-        return self.current_hold_time + self.pause_time
-
-    def finish_time(self):
-        if self.hold_timer is None:
-            return None
-        return dt.now() - self.hold_timer
-
-    def remaining_time(self):
-        finish = self.finish_time()
-        if finish is None:
-            return None
-        work = self.work_time()
-        if work is None:
-            return None
-        if finish > work:
-            return timedelta()
-        return work - finish
-
-    def remaining_time_info(self):
-        remaining = self.remaining_time()
-        if remaining is None:
-            return '-n/a-'
-        if remaining.microseconds >= 500000:
-            remaining -= timedelta(seconds=-1, microseconds=remaining.microseconds)
-        else:
-            remaining -= timedelta(microseconds=remaining.microseconds)
-        return str(remaining)
-
-    def receive(self, body):
-        if body in MessageFunctions and hasattr(self, body):
-            getattr(self, body)()
-            return
-        for work_data in serializers.deserialize("json", body):
-            session_detail = work_data.object
-            self.session_detail_id = session_detail.id
-            self.work(session_detail)
-            break   # only the first instance
-
-    def info(self):
-        log.debug('{0} is sending info to master'.format(self.name), True)
-        if self.on_info():
-            worker_type = '{0}.{1}'.format(self.__module__, self.__class__.__name__)
-            message = MessageReady + MessageSplit + self.name + MessageSplit + worker_type
-            for input_device in self.inputs.keys():
-                message += (MessageSplit + input_device)
-            for output_device in self.outputs.keys():
-                message += (MessageSplit + output_device)
-            self.send_to_master(message)
-        else:
-            self.report_error('Info failed')
-
-    def done(self):
-        log.debug('{0} is sending done to master'.format(self.name), True)
-        if self.on_done():
-            message = "{0}{1}{2}{3}{4}".format(MessageDone, MessageSplit,
-                                               self.name, MessageSplit,
-                                               str(self.session_detail_id))
-            self.send_to_master(message)
-        else:
-            self.report_error('Done failed')
-
-    def pause(self):
-        log.debug('{0} is sending paused to master'.format(self.name), True)
-        if not self.on_pause():
-            self.report_error('Pause failed')
-
-    def resume(self):
-        log.debug('{0} is sending resumed to master'.format(self.name), True)
-        if not self.on_resume():
-            self.report_error('Resume failed')
-
-    def reset(self):
-        log.debug('{0} is resetting'.format(self.name), True)
-        if self.on_reset():
-            self.info()
-        else:
-            self.report_error('Reset failed')
-
-    def report_error(self, err):
-        log.error('{0}: {1}'.format(self.name, err), True)
+        therm_name = os.environ.get(self.BOILER_NAME)
+        therm_io = os.environ.get(self.BOILER_IO)
+        therm_active = os.environ.get(self.BOILER_ACTIVE)
+        therm_cycle_time = os.environ.get(self.BOILER_CYCLE_TIME)
+        therm_callback_name = os.environ.get(self.BOILER_CALLBACK_NAME)
+        therm_callback = os.environ.get(self.BOILER_CALLBACK)
+        thermometer = Probe(boil_name, boil_io, boil_active, boil_cycle_time, boil_callback_name, boil_callback, self)
+        self.add_device(therm_name, thermometer)
 
     def is_done(self):
         if self.hold_timer is None:
@@ -287,33 +87,199 @@ class BaseWorker(threading.Thread):
             log.error('Error in cleaning up after work: {0}'.format(e.args[0]), True)
             return False
 
-    def on_start(self):
+    def start_worker(self, shedule):
         log.debug('Starting {0}'.format(self), True)
-
-    def on_info(self):
-        log.debug('Info {0}'.format(self), True)
-        return True
-
-    def on_done(self):
-        log.debug('Done {0}'.format(self), True)
-        return True
-
-    def on_pause(self):
-        log.debug('Pause {0}'.format(self), True)
+        try:
+            log.debug('Receiving boil schedule...')
+            self.working = True
+            self.hold_timer = None
+            self.hold_pause_timer = None
+            self.pause_time = timedelta(seconds=0)
+        except Exception as e:
+            log.debug('Boil worker failed to start work: {0}'.format(e.args[0]))
+            self.stop_all_devices()
+            return
         self.pause_all_devices()
-        self.hold_pause_timer = dt.now()
-        return True
-
-    def on_resume(self):
-        log.debug('Resume {0}'.format(self), True)
-        self.pause_time += (dt.now() - self.hold_pause_timer)
+        self.current_set_temperature = float(shedule["target"])
+        self.hold_timer = None
+        self.hold_pause_timer = None
+        seconds = float(shedule.hold_time) * float(shedule.time_unit_seconds)
+        self.current_hold_time = timedelta(seconds=seconds)
+        cycle_time = float(self.get_device[self.thermometer_name].cycle_time)
         self.resume_all_devices()
         return True
 
-    def on_reset(self):
-        self.pause_all_devices()
+    def stop_worker(self):
+        self.get_device[self.boiler_name].write(0.0)
+        self.stop_all_devices()
+        self.enabled = False
         return True
 
-    def on_stop(self):
-        self.stop_all_devices()
+    def pause_worker(self):
+        log.debug('Pause {0}'.format(self), True)
+        self.pause_all_devices()
+        self.hold_pause_timer = time.now()
         return True
+
+    def resume_worker(self):
+        log.info('Resume {0}'.format(self), True)
+        self.pause_time += (time.now() - self.hold_pause_timer)
+        self.resume_all_devices()
+        return True
+
+    def boil_temperature_callback(self, measured_value):
+        try:
+            calc = 1.0
+            log.debug('{0} reports measured value {1}'.format(self.name, measured_value))
+            self.current_temperature = measured_value
+            therm = self.get_device(self.thermometer_name)
+            measurement = {}
+            measurement["device"] = therm.name
+            measurement["value"] = self.current_temperature
+            measurement["set_point"] = self.current_set_temperature
+            if self.hold_timer is None:
+                measurement["work"] = 'Current temperature'
+                measurement["remaining"] = '{:.2f}'.format(self.current_temperature)
+            else:
+                measurement["work"] = 'Boiling left'
+                measurement["remaining"] = self.remaining_time_info()
+            self.send_measurement(measurement)
+            # Failsafe - start hold timer at 99.0 if reaching 100.0 is difficult
+            # due to thermal sensor placement
+            if self.working and self.hold_timer is None and \
+                    (measured_value >= self.current_set_temperature or measured_value >= 99.0):
+                self.hold_timer = time.now()
+            if self.is_done():
+                self.finish()
+            else:
+                self.get_device[self.boiler_name].write(calc)
+        except Exception as e:
+            log.error('Boil worker unable to react to temperature update, shutting down: {0}'.format(e.args[0]))
+            self.stop_all_devices()
+
+    def boil_heating_callback(self, heating_time):
+        try:
+            log.debug('{0} reports heating time of {1} seconds'.format(self.name, heating_time))
+            boiler = self.devices[self.boiler_name]
+            measurement = self.generate_worker_measurement(self, boiler)
+            measurement["value"] = heating_time
+            measurement["set_point"] = boiler.cycle_time
+            if self.hold_timer is None:
+                measurement["work"] = 'Bringing to boil'
+                measurement["remaining"] = '{:.2f}'.format(self.current_set_temperature - self.current_temperature)
+            else:
+                measurement["work"] = 'Holding boil'
+                measurement["remaining"] = '{:.2f} -> {:.2f} ({:+.2f})'.format(
+                    self.current_temperature,
+                    self.current_set_temperature,
+                    self.current_temperature - self.current_set_temperature)
+            self.send_measurement(measurement)
+        except Exception as e:
+            log.error('Boil worker unable to react to heating update, shutting down: {0}'.format(e.args[0]))
+            self.stop_all_devices()
+
+
+class DebugBoilWorker(BoilWorker):
+
+    BOIL_DEBUG_INIT_TEMP = 60.0
+    BOIL_DEBUG_CYCLE_TIME = 10.0
+    BOIL_DEBUG_DELAY = 4
+    BOIL_DEBUG_WATTS = 5500.0  # 1 x 5500.0
+    BOIL_DEBUG_LITERS = 50.0
+    BOIL_DEBUG_COOLING = 0.002
+    BOIL_DEBUG_TIME_DIVIDER = 60
+    BOIL_DEBUG_TIMEDELTA = 10  # seconds
+
+    def __init__(self, name):
+        BoilWorker.__init__(self, name)
+        self.test_temperature = self.BOIL_DEBUG_INIT_TEMP
+
+    def start_worker(self, shedule):
+        log.debug('Starting {0}'.format(self), True)
+        try:
+            log.debug('Receiving boil schedule...')
+            self.working = True
+            self.hold_timer = None
+            self.hold_pause_timer = None
+            self.pause_time = timedelta(seconds=0)
+        except Exception as e:
+            log.debug('Boil worker failed to start work: {0}'.format(e.args[0]))
+            self.stop_all_devices()
+            return
+        self.pause_all_devices()
+        self.current_set_temperature = float(shedule["target"])
+        self.hold_timer = None
+        self.hold_pause_timer = None
+        seconds = float(shedule.hold_time) * float(shedule.time_unit_seconds)
+        seconds /= self.BOIL_DEBUG_TIME_DIVIDER
+        self.get_device[self.thermometer_name].test_temperature = self.BOIL_DEBUG_INIT_TEMP
+        self.current_hold_time = timedelta(seconds=seconds)
+        cycle_time = float(self.get_device[self.thermometer_name].cycle_time)
+        self.resume_all_devices()
+        return True
+
+    def boil_temperature_callback(self, measured_value):
+        try:
+            calc = 1.0
+            log.debug('{0} reports measured value {1}'.format(self.name, measured_value))
+            self.current_temperature = measured_value
+            therm = self.get_device(self.thermometer_name)
+            measurement = {}
+            measurement["device"] = therm.name
+            measurement["value"] = self.current_temperature
+            measurement["set_point"] = self.current_set_temperature
+            if self.hold_timer is None:
+                measurement["work"] = 'Current temperature'
+                measurement["remaining"] = '{:.2f}'.format(self.current_temperature)
+            else:
+                measurement["work"] = 'Boiling left'
+                measurement["remaining"] = self.remaining_time_info()
+            self.test_temperature = self.current_temperature
+            measurement["debug_timer"] = self.debug_timer
+            self.debug_timer += timedelta(seconds = self.BOIL_DEBUG_TIMEDELTA)
+            self.send_measurement(measurement)
+            # Failsafe - start hold timer at 99.0 if reaching 100.0 is difficult
+            # due to thermal sensor placement
+            if self.working and self.hold_timer is None and \
+                    (measured_value >= self.current_set_temperature or measured_value >= 99.0):
+                self.hold_timer = time.now()
+            if self.is_done():
+                self.finish()
+            else:
+                self.get_device[self.boiler_name].write(calc)
+        except Exception as e:
+            log.error('Boil worker unable to react to temperature update, shutting down: {0}'.format(e.args[0]))
+            self.stop_all_devices()
+
+    def boil_heating_callback(self, heating_time):
+        try:
+            log.debug('{0} reports heating time of {1} seconds'.format(self.name, heating_time))
+            boiler = self.devices[self.boiler_name]
+            measurement = {}
+            measurement["value"] = heating_time
+            if self.hold_timer is None:
+                measurement["work"] = 'Bringing to boil'
+                measurement["remaining"] = '{:.2f}'.format(self.current_set_temperature - self.current_temperature)
+            else:
+                measurement["work"] = 'Holding boil'
+                measurement["remaining"] = '{:.2f} -> {:.2f} ({:+.2f})'.format(
+                    self.current_temperature,
+                    self.current_set_temperature,
+                    self.current_temperature - self.current_set_temperature)
+            measurement["debug_timer"] = self.debug_timer
+            self.send_measurement(measurement)
+            try:
+                self.devices[self.thermometer_name].test_temperature = \
+                    PID.calc_heating(self.current_temperature,
+                                     self.BOIL_DEBUG_WATTS,
+                                     heating_time,
+                                     boiler.cycle_time,
+                                     self.BOIL_DEBUG_LITERS,
+                                     self.BOIL_DEBUG_COOLING,
+                                     self.BOIL_DEBUG_DELAY,
+                                     self.BOIL_DEBUG_INIT_TEMP)
+            except Exception as e:
+                log.debug('Boil worker unable to update test temperature for debug: {0}'.format(e.args[0]))
+        except Exception as e:
+            log.error('Boil worker unable to react to heating update, shutting down: {0}'.format(e.args[0]))
+            self.stop_all_devices()

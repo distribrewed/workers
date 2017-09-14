@@ -10,18 +10,18 @@ DEVICE_DEBUG_CYCLE_TIME = 1.0
 DEVICE_PAUSE_CYCLE_TIME = 2.0
 
 class Device(threading.Thread):
-    def __init__(self, owner=None):
+    def __init__(self, name, io, active, cycle_time, callback_name, callback, owner = None):
         threading.Thread.__init__(self)
+        self.name = name
+        self.io = io
+        self.active = active
+        self.cycle_time = cycle_time
+        self.callback_name = callback_name
+        self.callback = self.callback
+        self.owner = owner
         self.read_write_lock = threading.Lock()
         self.shutdown = False
-        self.owner = owner
-        self.name = None
-        self.io = None
-        self.active = None
-        self.cycle_time = None
         self.enabled = False
-        self.callback_name = None
-        self.callback = None
 
     def init(self):
         pass

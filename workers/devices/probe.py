@@ -10,22 +10,9 @@ log = logging.getLogger(__name__)
 
 class Probe(Device):
 
-    NAME =          "DEVICE_PROBE_NAME"
-    IO =            "DEVICE_PROBE_IO"
-    ACTIVE =        "DEVICE_PROBE_ACTIVE"
-    CYCLE_TIME =    "DEVICE_PROBE_CYCLE_TIME"
-    CALLBACK_NAME = "DEVICE_PROBE_CALLBACK_NAME"
-    CALLBACK =      "DEVICE_PROBE_CALLBACK"
-
-    def __init__(self, owner=None):
+    def __init__(self, name, io, active, cycle_time, callback_name, callback, owner = None):
+        Device.__init__(self, name, io, active, cycle_time, callback_name, callback, owner)
         self.test_temperature = 0.0
-        Device.__init__(self, owner)
-        self.name = os.environ.get(self.NAME)
-        self.io = os.environ.get(self.IO)
-        self.active = os.environ.get(self.ACTIVE)
-        self.cycle_time = os.environ.get(self.CYCLE_TIME)
-        self.callback_name = os.environ.get(self.CALLBACK_NAME)
-        self.callback = os.environ.get(self.CALLBACK)
 
     def init(self):
         pass
