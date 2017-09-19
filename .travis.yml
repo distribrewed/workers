@@ -9,20 +9,11 @@ branches:
 
 jobs:
   include:
-    - stage: Build x64 image
+    - stage: Build image
+      env: ARCH=x64
       script:
-      - docker build -t distribrewed/workers:x64 -f Dockerfile .
-      - docker login -u="$DOCKER_USER" -p="$DOCKER_PASS"
-      - docker push distribrewed/workers:x64
-    - stage: Build ARM image
+      - ./travis_scripts/build_$ARCH.sh
+    - stage: Build image
+      env: ARCH=arm
       script:
-      - sed 's/\/core:x64/\/core:arm/g' Dockerfile > Dockerfile.arm
-      - docker run --rm --privileged multiarch/qemu-user-static:register --reset
-      - docker build -t distribrewed/workers:arm -f Dockerfile.arm .
-      - docker login -u="$DOCKER_USER" -p="$DOCKER_PASS"
-      - docker push distribrewed/workers:arm
-#    - stage: Test docker pull
-#      script:
-#      - docker run -t distribrewed/workers:x64 python --version
-#      - docker run --rm --privileged multiarch/qemu-user-static:register --reset
-#      - docker run -t distribrewed/workers:arm python --version
+      - ./travis_scripts/build_$ARCH.sh
