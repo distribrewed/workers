@@ -1,8 +1,8 @@
 import logging
 import os
 
-from distribrewed_core.base.worker import BaseWorker
 import telepot
+from distribrewed_core.base.worker import BaseWorker
 
 log = logging.getLogger(__name__)
 
@@ -20,15 +20,16 @@ class TelegramWorker(BaseWorker):
             exit(0)
         self.bot = telepot.Bot(token)
 
-    def telegram_bot_info(self):
-        return self.bot.getMe()
+    def _worker_info(self):
+        base = super(TelegramWorker, self)._worker_info()
+        bot_info = self.bot.getMe()
+        bot_info['telegram_id'] = bot_info.pop('id')
+        return {**base, **bot_info}
 
-    def telegram_chat_info(self):
-        self.bot.getChat(self.chat_id)
-
-    def telegram_bot_send_message(self, message):
+    def send_message(self, message):
         self.bot.sendMessage(self.chat_id, message)
+
 
 if __name__ == "__main__":
     worker = TelegramWorker()
-    worker.telegram_bot_send_message('Whoop Whoop')
+    worker.send_message('Whoop Whoop')
