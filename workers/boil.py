@@ -7,9 +7,9 @@ from distribrewed_core.base.worker import ScheduleWorker
 log = logging.getLogger(__name__)
 
 
-class BoilWorker(ScheduleWorker):
+class TemperatureWorker(ScheduleWorker):
     def __init__(self):
-        super(BoilWorker, self).__init__()
+        super(TemperatureWorker, self).__init__()
 
     def _setup_worker_schedule(self, worker_schedule):
         log.info('Received schedule: {0}'.format(worker_schedule))
@@ -17,7 +17,7 @@ class BoilWorker(ScheduleWorker):
 
     @staticmethod
     def do_some_work():
-        log.info('Woop woop')
+        log.info('Boil stuff')
 
 
 if __name__ == "__main__":
@@ -27,7 +27,7 @@ if __name__ == "__main__":
     h.setFormatter(logging.Formatter('%(pathname)s:%(lineno)s: [%(levelname)s] %(message)s'))
     logging.getLogger().addHandler(h)
 
-    worker = BoilWorker()
+    worker = TemperatureWorker()
     worker.start_worker([
         (1, 40.0),
         (2, 50.0)
