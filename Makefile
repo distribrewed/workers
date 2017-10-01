@@ -12,5 +12,7 @@ docker-pull-base:
 docker-build: docker-pull-base
 	docker build ${BUILD_FLAGS} -t ${DOCKER_IMAGE_TAG} .
 
-docker-run-telegram-worker: docker-build
-	docker run -t -e WORKER_PLUGIN_CLASS=TelegramWorker -e WORKER_NAME=telegram ${DOCKER_STACK_RABBITMQ_LINK} ${DOCKER_IMAGE_TAG}
+WORKER ?= TemperatureWorker
+
+docker-run-worker: docker-build
+	docker run -t -e WORKER_PLUGIN_CLASS=${WORKER} -e WORKER_NAME=telegram ${DOCKER_STACK_RABBITMQ_LINK} ${DOCKER_IMAGE_TAG}
