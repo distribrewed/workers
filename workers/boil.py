@@ -8,14 +8,14 @@ from distribrewed_core.base.worker import ScheduleWorker
 log = logging.getLogger(__name__)
 
 
-class TemperatureWorker(ScheduleWorker):
+class TemperatureWorkerExample(ScheduleWorker):
     @staticmethod
     def duration_str_to_delta(str):
         t = datetime.strptime(str, "%H:%M:%S")
         return timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
 
     def __init__(self):
-        super(TemperatureWorker, self).__init__()
+        super(TemperatureWorkerExample, self).__init__()
 
     def _setup_worker_schedule(self, worker_schedule):
         log.info('Received schedule: {0}'.format(worker_schedule))
@@ -51,7 +51,7 @@ if __name__ == "__main__":
     h.setFormatter(logging.Formatter('%(pathname)s:%(lineno)s: [%(levelname)s] %(message)s'))
     logging.getLogger().addHandler(h)
 
-    worker = TemperatureWorker()
+    worker = TemperatureWorkerExample()
     worker.start_worker('asdasd', [
         ['0:00:15', 40.0],
         ['0:00:20', 50.0]
