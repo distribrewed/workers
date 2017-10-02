@@ -2,6 +2,7 @@
 import os
 import time
 from datetime import timedelta as timedelta
+from datetime import datetime as datetime
 from prometheus_client import Counter
 import logging
 from device import DeviceWorker
@@ -32,6 +33,7 @@ class TemperatureWorker(DeviceWorker):
         self.current_hold_time = timedelta(minutes=0)
         self.hold_timer = None
         self.hold_pause_timer = None
+        self.paused = False
         self.pause_time = 0.0
         self.session_detail_id = 0
         self.mash_name = os.environ.get(self.MASH_NAME)
@@ -40,6 +42,11 @@ class TemperatureWorker(DeviceWorker):
         self.kpid = None
         self.current_temperature = 0.0
         self.current_set_temperature = 0.0
+
+    @staticmethod
+    def duration_str_to_delta(str):
+        t = datetime.strptime(str, "%H:%M:%S")
+        return timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
 
     def add_devices(self):
         mash_name = os.environ.get(self.MASH_NAME)
@@ -57,6 +64,13 @@ class TemperatureWorker(DeviceWorker):
         therm_callback = os.environ.get(self._mash_temperature_callback())
         thermometer = Probe(therm_name, therm_io, therm_active, therm_cycle_time, therm_callback, self)
         self.add_device(therm_name, thermometer)
+
+    def _info(self):
+        return {
+            'schedule_id': self.schedule_id,
+            'is_running': self.working,
+            'is_paused': self.paused,
+        }
 
     def is_done(self):
         if self.hold_timer is None:
@@ -81,9 +95,10 @@ class TemperatureWorker(DeviceWorker):
             log.error('Error in cleaning up after work: {0}'.format(e.args[0]), True)
             return False
 
-    def start_worker(self, shedule):
+    def start_worker(self, schedule_id, schedule):
         try:
             log.debug('Receiving mash schedule...')
+            self.schedule_id = schedule_id
             self.working = True
             self.hold_timer = None
             self.hold_pause_timer = None
@@ -91,12 +106,13 @@ class TemperatureWorker(DeviceWorker):
         except Exception as e:
             log.debug('Mash worker failed to start work: {0}'.format(e.args[0]))
             self._stop_all_devices()
+            self.register()
             return
         self._pause_all_devices()
-        self.current_set_temperature = float(shedule["target"])
+        self.current_set_temperature = float(schedule[0][1])
         self.hold_timer = None
         self.hold_pause_timer = None
-        seconds = float(shedule["hold_time"]) * float(shedule["time_unit_seconds"])
+        seconds = self.duration_str_to_delta(schedule[0][0])
         self.current_hold_time = timedelta(seconds=seconds)
         cycle_time = float(self._get_device[self.thermometer_name].cycle_time)
         if self.pid is None:
@@ -104,23 +120,31 @@ class TemperatureWorker(DeviceWorker):
         else:
             self.pid = PID(self.pid.pid_params, self.current_set_temperature, cycle_time)
         self._resume_all_devices()
+        self.register()
 
     def stop_worker(self):
         self._get_device[self.mash_name].write(0.0)
         self._stop_all_devices()
         self.enabled = False
+        self._finish()
+        self.register()
+        self._send_master_is_finished()
         return True
 
     def pause_worker(self):
         log.debug('Pause {0}'.format(self), True)
         self._pause_all_devices()
         self.hold_pause_timer = time.now()
+        self.paused = True
+        self.register()
         return True
 
     def resume_worker(self):
         log.info('Resume {0}'.format(self), True)
         self.pause_time += (time.now() - self.hold_pause_timer)
         self._resume_all_devices()
+        self.paused = False
+        self.register()
         return True
 
     def _mash_temperature_callback(self, measured_value):
@@ -178,7 +202,7 @@ class TemperatureWorker(DeviceWorker):
             self._stop_all_devices()
 
 
-class DebugMashWorker(TemperatureWorker):
+class DebugTemperatureWorker(TemperatureWorker):
 
     MASH_DEBUG_INIT_TEMP = 60.0
     MASH_DEBUG_CYCLE_TIME = 10.0

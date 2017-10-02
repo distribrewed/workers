@@ -2,13 +2,13 @@ import logging
 import os
 import time
 
-from distribrewed_core.base.worker import BaseWorker
-import telepot
+import schedule
+from distribrewed_core.base.worker import ScheduleWorker
 
 log = logging.getLogger(__name__)
 
 
-class DeviceWorker(BaseWorker):
+class DeviceWorker(ScheduleWorker):
 
     def __init__(self):
         super(DeviceWorker, self).__init__()
