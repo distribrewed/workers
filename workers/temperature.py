@@ -86,15 +86,6 @@ class TemperatureWorker(DeviceWorker):
         log.debug('Time until work done: {0}'.format(work - finish), True)
         return False
 
-    def _finish(self):
-        try:
-            self.pause_all_devices()
-            self.working = False
-            return True
-        except Exception as e:
-            log.error('Error in cleaning up after work: {0}'.format(e.args[0]), True)
-            return False
-
     def start_worker(self, schedule_id, schedule):
         try:
             log.debug('Receiving mash schedule...')
@@ -124,9 +115,9 @@ class TemperatureWorker(DeviceWorker):
 
     def stop_worker(self):
         self._get_device[self.mash_name].write(0.0)
-        self._stop_all_devices()
+        self.pause_all_devices()
+        self.working = False
         self.enabled = False
-        self._finish()
         self.register()
         self._send_master_is_finished()
         return True
