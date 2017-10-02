@@ -1,15 +1,12 @@
 import logging
-import os
 import time
 
-import schedule
 from distribrewed_core.base.worker import ScheduleWorker
 
 log = logging.getLogger(__name__)
 
 
 class DeviceWorker(ScheduleWorker):
-
     def __init__(self):
         super(DeviceWorker, self).__init__()
         self.devices = {}
@@ -78,7 +75,7 @@ class DeviceWorker(ScheduleWorker):
             device.stop_device()
 
     def _send_measurement(self, worker_measurement):
-        pass # TODO: send to prometheus
+        pass  # TODO: send to prometheus
 
     def start_worker(self, shcedule):
         pass

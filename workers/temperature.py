@@ -1,10 +1,12 @@
 #!/usr/bin python
+import logging
 import os
 import time
-from datetime import timedelta as timedelta
 from datetime import datetime as datetime
-from prometheus_client import Counter
-import logging
+from datetime import timedelta as timedelta
+
+from prometheus_client import Gauge
+
 from device import DeviceWorker
 from devices.probe import Probe, SimulationProbe
 from devices.ssr import SSR, SimulationSSR
@@ -12,19 +14,24 @@ from utils.pid import PID
 
 log = logging.getLogger(__name__)
 
-class TemperatureWorker(DeviceWorker):
 
-    MASH_NAME =                 "MASH_NAME"
-    MASH_IO =                   "MASH_IO"
-    MASH_ACTIVE =               "MASH_ACTIVE"
-    MASH_CYCLE_TIME =           "MASH_CYCLE_TIME"
-    THERMOMETER_NAME =          "THERMOMETER_NAME"
-    THERMOMETER_IO =            "THERMOMETER_IO"
-    THERMOMETER_ACTIVE =        "THERMOMETER_ACTIVE"
-    THERMOMETER_CYCLE_TIME =    "THERMOMETER_CYCLE_TIME"
+class TemperatureWorker(DeviceWorker):
+    MASH_NAME = "MASH_NAME"
+    MASH_IO = "MASH_IO"
+    MASH_ACTIVE = "MASH_ACTIVE"
+    MASH_CYCLE_TIME = "MASH_CYCLE_TIME"
+    THERMOMETER_NAME = "THERMOMETER_NAME"
+    THERMOMETER_IO = "THERMOMETER_IO"
+    THERMOMETER_ACTIVE = "THERMOMETER_ACTIVE"
+    THERMOMETER_CYCLE_TIME = "THERMOMETER_CYCLE_TIME"
 
     def __init__(self):
         DeviceWorker.__init__(self)
+        try:
+            TemperatureWorker.PROM_HEATING_TIME = Gauge('HEATING_TIME', 'Heating time')
+            TemperatureWorker.PROM_TEMPERATURE = Gauge('TEMPERATURE', 'Temperature')
+        except ValueError:
+            pass  # It is already defined
         self.working = False
         self.simulation = False
         self.schedule = None
@@ -178,7 +185,7 @@ class TemperatureWorker(DeviceWorker):
     def _mash_heating_callback(self, heating_time):
         try:
             log.debug('{0} reports heating time of {1} seconds'.format(self.name, heating_time))
-            mash = self._get_device(self.mash_name) # type: SSR
+            mash = self._get_device(self.mash_name)  # type: SSR
             measurement = {}
             measurement["name"] = self.name
             measurement["device_name"] = mash.name
@@ -198,9 +205,15 @@ class TemperatureWorker(DeviceWorker):
             log.error('Mash worker unable to react to heating update, shutting down: {0}'.format(e.args[0]))
             self._stop_all_devices()
 
+    def _send_measurement(self, worker_measurement):
+        # TODO: send to prometheus
+        if worker_measurement.get('device_name', '') == os.environ.get(self.MASH_NAME):
+            TemperatureWorker.PROM_HEATING_TIME.set(worker_measurement.get('value', -1))
+        elif worker_measurement.get('device_name', '') == os.environ.get(self.THERMOMETER_NAME):
+            TemperatureWorker.PROM_TEMPERATURE.set(worker_measurement.get('value', -1))
+
 
 class DebugTemperatureWorker(TemperatureWorker):
-
     MASH_DEBUG_INIT_TEMP = 60.0
     MASH_DEBUG_CYCLE_TIME = 10.0
     MASH_DEBUG_DELAY = 4
@@ -280,10 +293,10 @@ class DebugTemperatureWorker(TemperatureWorker):
                 measurement["remaining"] = '{:.2f}'.format(self.current_temperature)
             else:
                 measurement["work"] = 'Mashing'
-                #measurement["remaining"] = self.remaining_time_info()
+                # measurement["remaining"] = self.remaining_time_info()
             self.test_temperature = self.current_temperature
             measurement["debug_timer"] = self.debug_timer
-            self.debug_timer += timedelta(seconds = self.MASH_DEBUG_TIMEDELTA)
+            self.debug_timer += timedelta(seconds=self.MASH_DEBUG_TIMEDELTA)
             self._send_measurement(measurement)
             if self.working and self.hold_timer is None and measured_value >= self.current_set_temperature:
                 self.hold_timer = datetime.now()
@@ -330,6 +343,7 @@ class DebugTemperatureWorker(TemperatureWorker):
         except Exception as e:
             log.error('Mash worker unable to react to heating update, shutting down: {0}'.format(e.args[0]))
             self._stop_all_devices()
+
 
 if __name__ == "__main__":
     # Setup debug logging
