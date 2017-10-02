@@ -15,7 +15,7 @@ class DeviceWorker(ScheduleWorker):
         self.devices = {}
         self.pausing_all_devices = False
         self.add_devices()
-        self.start_all_devices()
+        self._start_all_devices()
 
     def worker_info(self):
         return {
@@ -30,18 +30,18 @@ class DeviceWorker(ScheduleWorker):
         pass
 
     def _add_device(self, name, device):
-        self.inputs[name] = device
+        self.devices[name] = device
 
     def _get_device(self, name):
         return self.devices[name]
 
     def _start_all_devices(self):
-        for device in self.devices.values:
+        for name, device in self.devices.items():
             device.run_device()
         return
 
     def _is_any_device_enabled(self):
-        for device in self.devices.values():
+        for name, device in self.devices.items():
             if device.enabled:
                 return True
         return False

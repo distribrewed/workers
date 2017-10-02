@@ -42,8 +42,8 @@ class Probe(Device):
         time.sleep(self.cycle_time)
 
 class SimulationProbe(Probe):
-    def __init__(self, owner=None):
-        super(Probe, self).__init__()
+    def __init__(self, name, io, active, cycle_time, callback, owner = None):
+        Probe.__init__(self, name, io, active, cycle_time, callback, owner)
 
     def register(self):
         return True

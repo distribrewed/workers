@@ -68,18 +68,18 @@ class SSR(Device):
     def run_cycle(self):
         # grab the current value if it should be changed during the cycle
         on_percent = self.on_percent
-        on_time = on_percent * self.cycle_time
+        on_time = on_percent * (float)(self.cycle_time)
         if self.on_percent > 0.0:
             self.set_ssr_state(True)
             time.sleep(on_time)
         if self.on_percent < 1.0:
             self.set_ssr_state(False)
-            time.sleep((1.0-on_percent)*self.cycle_time)
+            time.sleep((1.0-on_percent)*(float)(self.cycle_time))
         self.do_callback(on_time)
 
 class SimulationSSR(SSR):
-    def __init__(self, owner=None):
-        super(SSR, self).__init__()
+    def __init__(self, name, io, active, cycle_time, callback, owner = None):
+        SSR.__init__(self, name, io, active, cycle_time, callback, owner)
 
     def register(self):
         return True
@@ -92,7 +92,7 @@ class SimulationSSR(SSR):
 
     def run_cycle(self):
         on_percent = self.on_percent
-        on_time = on_percent * self.cycle_time
+        on_time = on_percent * (float)(self.cycle_time)
         time.sleep(DEVICE_DEBUG_CYCLE_TIME)
         self.do_callback(on_time)
         return
