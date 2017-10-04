@@ -77,14 +77,3 @@ class DeviceWorker(ScheduleWorker):
     def _send_measurement(self, worker_measurement):
         pass  # TODO: send to prometheus
 
-    def start_worker(self, shcedule):
-        pass
-
-    def stop_worker(self):
-        pass
-
-    def pause_worker(self):
-        pass
-
-    def resume_worker(self):
-        pass
