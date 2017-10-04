@@ -1,6 +1,5 @@
 #!/usr/bin python
 import logging
-import os
 import time
 
 from workers.devices.device import Device, DEVICE_DEBUG_CYCLE_TIME
@@ -9,8 +8,7 @@ log = logging.getLogger(__name__)
 
 
 class Probe(Device):
-
-    def __init__(self, name, io, active, cycle_time, callback, owner = None):
+    def __init__(self, name, io, active, cycle_time, callback, owner=None):
         Device.__init__(self, name, io, active, cycle_time, callback, owner)
         self.test_temperature = 0.0
 
@@ -18,7 +16,9 @@ class Probe(Device):
         pass
 
     def register(self):
-        log.error("Can not register probe at \"{0}\", try to run \"sudo modprobe w1-gpio && sudo modprobe w1_therm\" in commandline or check your probe connections".format(self.io))
+        log.error(
+            "Can not register probe at \"{0}\", try to run \"sudo modprobe w1-gpio && sudo modprobe w1_therm\" in commandline or check your probe connections".format(
+                self.io))
 
     def write(self, value):
         pass
@@ -31,7 +31,7 @@ class Probe(Device):
                 log.debug('Temp reading wrong, do not update temp, wait for next reading')
             else:
                 probe_heat = fo.readline().split('=')[1]
-            temperature = float(probe_heat)/1000
+            temperature = float(probe_heat) / 1000
             fo.close()
         return temperature
 
@@ -41,8 +41,9 @@ class Probe(Device):
         self.do_callback(measured_value)
         time.sleep(self.cycle_time)
 
+
 class SimulationProbe(Probe):
-    def __init__(self, name, io, active, cycle_time, callback, owner = None):
+    def __init__(self, name, io, active, cycle_time, callback, owner=None):
         Probe.__init__(self, name, io, active, cycle_time, callback, owner)
 
     def register(self):

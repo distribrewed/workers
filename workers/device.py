@@ -76,4 +76,3 @@ class DeviceWorker(ScheduleWorker):
 
     def _send_measurement(self, worker_measurement):
         pass  # TODO: send to prometheus
-

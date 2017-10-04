@@ -1,26 +1,25 @@
 import logging
 
-from workers.temperature import TemperatureWorker
 from workers.debug_temperature import DebugTemperatureWorker
+from workers.temperature import TemperatureWorker
 
 log = logging.getLogger(__name__)
 
 
 class BoilWorker(TemperatureWorker):
-
     def __init__(self):
         super(TemperatureWorker, self).__init__()
 
     def _pid_calculate(self, measured_value):
-        return 1.0 # Just boil as high as we can
+        return 1.0  # Just boil as high as we can
+
 
 class DebugBoilWorker(DebugTemperatureWorker):
-
     def __init__(self):
         super(DebugTemperatureWorker, self).__init__()
 
     def _pid_calculate(self, measured_value):
-        return 1.0 # Just boil as high as we can
+        return 1.0  # Just boil as high as we can
 
 
 if __name__ == "__main__":

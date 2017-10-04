@@ -5,12 +5,12 @@ import time
 
 log = logging.getLogger(__name__)
 
-
 DEVICE_DEBUG_CYCLE_TIME = 1.0
 DEVICE_PAUSE_CYCLE_TIME = 2.0
 
+
 class Device(threading.Thread):
-    def __init__(self, name, io, active, cycle_time, callback, owner = None):
+    def __init__(self, name, io, active, cycle_time, callback, owner=None):
         threading.Thread.__init__(self)
         self.name = name
         self.io = io
@@ -97,4 +97,3 @@ class Device(threading.Thread):
             return True, None
         except Exception as e:
             return False, e.args[0]
-
