@@ -4,7 +4,7 @@ import os
 from datetime import datetime as datetime
 from datetime import timedelta as timedelta
 
-import schedule
+from distribrewed_core.base.worker import ScheduleWorker
 from prometheus_client import Gauge
 
 from device import DeviceWorker
@@ -25,13 +25,10 @@ class TemperatureWorker(DeviceWorker):
     THERMOMETER_ACTIVE = "THERMOMETER_ACTIVE"
     THERMOMETER_CYCLE_TIME = "THERMOMETER_CYCLE_TIME"
 
+    EVENT_ON_TEMPERATURE_REACHED = "on_temperature_reached"
+
     def __init__(self):
         DeviceWorker.__init__(self)
-        try:
-            TemperatureWorker.PROM_HEATING_TIME = Gauge('HEATING_TIME', 'Heating time')
-            TemperatureWorker.PROM_TEMPERATURE = Gauge('TEMPERATURE', 'Temperature')
-        except ValueError:
-            pass  # It is already defined
         self.working = False
         self.simulation = False
         self.schedule = None
@@ -50,11 +47,17 @@ class TemperatureWorker(DeviceWorker):
         self.start_time = None
         self.stop_time = None
         self.start_hold_timer = None
+        self._setup_prometheus()
 
     @staticmethod
     def duration_str_to_delta(str):
         t = datetime.strptime(str, "%H:%M:%S")
         return timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
+
+    def _events(self):
+        events = ScheduleWorker._events(self)
+        events.append(self.EVENT_ON_TEMPERATURE_REACHED)
+        return events
 
     def add_devices(self):
         ssr_name = os.environ.get(self.SSR_NAME)
@@ -131,7 +134,7 @@ class TemperatureWorker(DeviceWorker):
         return True
 
     def pause_worker(self):
-        log.debug('Pause {0}'.format(self), True)
+        log.debug('Pause {0}'.format(self))
         self._pause_all_devices()
         if self.start_hold_time is not None:
             self.hold_pause_timer = datetime.now()
@@ -140,7 +143,7 @@ class TemperatureWorker(DeviceWorker):
         return True
 
     def resume_worker(self):
-        log.info('Resume {0}'.format(self), True)
+        log.info('Resume {0}'.format(self))
         if self.hold_pause_timer is not None and self.start_hold_time is not None:
             self.pause_time += (datetime.now() - self.hold_pause_timer)
         self.hold_pause_timer = None
@@ -175,7 +178,7 @@ class TemperatureWorker(DeviceWorker):
             if self.pid is not None:
                 calc = self._calculate_pid(measured_value)
                 log.debug('{0} reports measured value {1} ({2}) and pid calculated {3}'.
-                          format(self.name, self.current_temperature, measured_value, calc))
+                          format(self.name, round(measured_value, 1), measured_value, calc))
             else:
                 log.debug('{0} reports measured value {1} ({2})'.format(self.name, round(measured_value, 1), measured_value))
             if self.start_hold_timer is None:
@@ -194,8 +197,10 @@ class TemperatureWorker(DeviceWorker):
             self._send_measurement(measurement)
             if self.working and self.start_hold_timer is None and round(measured_value, 1) >= self.current_set_temperature:
                 self.start_hold_timer = datetime.now()
+                self._send_event_to_master(self.EVENT_ON_TEMPERATURE_REACHED)
             if self._is_done():
                 self.stop_worker()
+                self._send_master_is_finished()
             elif self.pid is not None:
                 self._get_device(self.ssr_name).write(calc)
         except Exception as e:
@@ -214,8 +219,8 @@ class TemperatureWorker(DeviceWorker):
             measurement = self._create_measurement(
                 self.name,
                 self._get_device(self.ssr_name).name,
-                self.current_temperature,
-                self.current_set_temperature,
+                heating_time,
+                self.current_hold_time,
                 work,
                 remaining
             )
@@ -225,8 +230,21 @@ class TemperatureWorker(DeviceWorker):
             log.error('TemperatureWorker unable to react to heating update, shutting down: {0}'.format(e.args[0]))
             self._stop_all_devices()
 
+    def _setup_prometheus(self):
+        try:
+            labels = ['name', "device_name", 'device_type']
+            TemperatureWorker.PROM_HEATING_TIME = Gauge('HEATING_TIME', 'Heating time', labels)
+            TemperatureWorker.PROM_TEMPERATURE = Gauge('TEMPERATURE', 'Temperature', labels)
+        except ValueError:
+            pass  # It is already defined
+
     def _send_measurement(self, worker_measurement):
         if worker_measurement.get('device_name', '') == os.environ.get(self.SSR_NAME):
-            TemperatureWorker.PROM_HEATING_TIME.set(worker_measurement.get('value', -1))
+            TemperatureWorker.PROM_HEATING_TIME.labels(self.name, self.ssr_name, 'SSR').set(worker_measurement.get('value', -1))
         elif worker_measurement.get('device_name', '') == os.environ.get(self.THERMOMETER_NAME):
-            TemperatureWorker.PROM_TEMPERATURE.set(worker_measurement.get('value', -1))
+            TemperatureWorker.PROM_TEMPERATURE.labels(self.name, self.thermometer_name, 'Thermometer').set(worker_measurement.get('value', -1))
+        log.info('{0}: {1} - work {2} - remaining {3}'.format(
+            worker_measurement.get('device_name'),
+            worker_measurement.get('value'),
+            worker_measurement.get('work'),
+            worker_measurement.get('remaining')))

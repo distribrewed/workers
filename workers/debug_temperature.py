@@ -4,6 +4,7 @@ import os
 from datetime import timedelta as timedelta
 from datetime import datetime as datetime
 
+from distribrewed_core.base.worker import ScheduleWorker
 from devices.probe import SimulationProbe
 from devices.ssr import SimulationSSR
 from utils.pid import PID
@@ -13,7 +14,7 @@ log = logging.getLogger(__name__)
 
 
 class DebugTemperatureWorker(TemperatureWorker):
-    DEBUG_INIT_TEMP = 60.0
+    DEBUG_INIT_TEMP = 40.0
     DEBUG_CYCLE_TIME = 10.0
     DEBUG_DELAY = 4
     DEBUG_WATTS = 5500.0  # 1 x 5500.0
