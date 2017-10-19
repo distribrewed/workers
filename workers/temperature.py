@@ -248,3 +248,108 @@ class TemperatureWorker(DeviceWorker):
             worker_measurement.get('value'),
             worker_measurement.get('work'),
             worker_measurement.get('remaining')))
+
+    def _get_grafana_rows(self):
+        # 1. Define the panel in grafana
+        # 2. View panel json i.e. https://imgur.com/HcsW9sf
+        # 3. Paste JSON and convert to python dict
+        # This example only has 1 row with 1 panel
+        return [
+            {
+                "panels": [
+                    {
+                        "aliasColors": {},
+                        "bars": False,
+                        "dashLength": 10,
+                        "dashes": False,
+                        "datasource": None,
+                        "fill": 1,
+                        "id": 1,
+                        "legend": {
+                            "avg": False,
+                            "current": False,
+                            "max": False,
+                            "min": False,
+                            "show": True,
+                            "total": False,
+                            "values": False
+                        },
+                        "lines": True,
+                        "linewidth": 1,
+                        "links": [],
+                        "nullPointMode": "null",
+                        "percentage": False,
+                        "pointradius": 5,
+                        "points": False,
+                        "renderer": "flot",
+                        "seriesOverrides": [
+                            {
+                                "alias": "Heating Time",
+                                "yaxis": 2
+                            }
+                        ],
+                        "spaceLength": 10,
+                        "span": 12,
+                        "stack": False,
+                        "steppedLine": False,
+                        "targets": [
+                            {
+                                "expr": "TEMPERATURE{name=\"" + self.name + "\"}",
+                                "format": "time_series",
+                                "instant": False,
+                                "interval": "",
+                                "intervalFactor": 2,
+                                "legendFormat": "Temperature",
+                                "refId": "A",
+                                "step": 1
+                            },
+                            {
+                                "expr": "HEATING_TIME{name=\"" + self.name + "\"}",
+                                "format": "time_series",
+                                "instant": False,
+                                "intervalFactor": 2,
+                                "legendFormat": "Heating Time",
+                                "refId": "B",
+                                "step": 1
+                            }
+                        ],
+                        "thresholds": [],
+                        "timeFrom": None,
+                        "timeShift": None,
+                        "title": self.name,
+                        "tooltip": {
+                            "shared": True,
+                            "sort": 0,
+                            "value_type": "individual"
+                        },
+                        "type": "graph",
+                        "xaxis": {
+                            "buckets": None,
+                            "mode": "time",
+                            "name": None,
+                            "show": True,
+                            "values": []
+                        },
+                        "yaxes": [
+                            {
+                                "format": "celsius",
+                                "label": None,
+                                "logBase": 1,
+                                "max": None,
+                                "min": None,
+                                "show": True
+                            },
+                            {
+                                "decimals": None,
+                                "format": "percentunit",
+                                "label": "",
+                                "logBase": 1,
+                                "max": None,
+                                "min": None,
+                                "show": True
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
