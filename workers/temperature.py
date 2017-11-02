@@ -239,10 +239,13 @@ class TemperatureWorker(DeviceWorker):
             pass  # It is already defined
 
     def _send_measurement(self, worker_measurement):
+        log.info('Send measurement triggered')
         if worker_measurement.get('device_name', '') == os.environ.get(self.SSR_NAME):
             TemperatureWorker.PROM_HEATING_TIME.labels(self.name, self.ssr_name, 'SSR').set(worker_measurement.get('value', -1))
+            log.info('Sending heating time to Prometheus')
         elif worker_measurement.get('device_name', '') == os.environ.get(self.THERMOMETER_NAME):
             TemperatureWorker.PROM_TEMPERATURE.labels(self.name, self.thermometer_name, 'Thermometer').set(worker_measurement.get('value', -1))
+            log.info('Sending temperature to Prometheus')
         log.info('{0}: {1} - work {2} - remaining {3}'.format(
             worker_measurement.get('device_name'),
             worker_measurement.get('value'),
