@@ -63,7 +63,7 @@ class TemperatureWorker(DeviceWorker):
         ssr_name = os.environ.get(self.SSR_NAME)
         ssr_io = os.environ.get(self.SSR_IO)
         ssr_active = os.environ.get(self.SSR_ACTIVE, 'false').lower() in ['1', 'true']
-        ssr_cycle_time = os.environ.get(self.SSR_CYCLE_TIME)
+        ssr_cycle_time = int(os.environ.get(self.SSR_CYCLE_TIME))
         ssr_callback = self._ssr_callback
         ssr = self._create_ssr(ssr_name, ssr_io, ssr_active, ssr_cycle_time, ssr_callback)
         self._add_device(ssr_name, ssr)
@@ -71,7 +71,7 @@ class TemperatureWorker(DeviceWorker):
         therm_name = os.environ.get(self.THERMOMETER_NAME)
         therm_io = os.environ.get(self.THERMOMETER_IO)
         therm_active = os.environ.get(self.THERMOMETER_ACTIVE, 'false').lower() in ['1', 'true']
-        therm_cycle_time = os.environ.get(self.THERMOMETER_CYCLE_TIME)
+        therm_cycle_time = int(os.environ.get(self.THERMOMETER_CYCLE_TIME))
         therm_callback = self._temperature_callback
         thermometer = self._create_thermometer(therm_name, therm_io, therm_active, therm_cycle_time, therm_callback)
         self._add_device(therm_name, thermometer)
