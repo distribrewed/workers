@@ -113,7 +113,7 @@ class TemperatureWorker(DeviceWorker):
         self.current_hold_time = self.duration_str_to_delta(worker_schedule[0][0])
         self.working = True
         self.start_time = datetime.now()
-        self.start_hold_time = None
+        self.start_hold_timer = None
         self.hold_pause_timer = None
         self.pause_time = timedelta(seconds=0)
         cycle_time = float(self._get_device(self.thermometer_name).cycle_time)
