@@ -41,7 +41,10 @@ class Device(threading.Thread):
     def run_device(self):
         if self.enabled:
             return
-        self.auto_setup()
+        ok, msg = self.auto_setup()
+        log.info(ok)
+        if msg is not None:
+            log.info(msg)
         self.start()
 
     def pause_device(self):
@@ -64,6 +67,8 @@ class Device(threading.Thread):
         pass
 
     def check(self):
+        log.info("Checking io")
+        log.info(self.io)
         try:
             with open(self.io) as file:
                 return True

@@ -207,9 +207,10 @@ class TemperatureWorker(DeviceWorker):
             log.error('TemperatureWorker unable to react to temperature update, shutting down: {0}'.format(e.args[0]))
             self._stop_all_devices()
 
-    def _ssr_callback(self, heating_time):
+    def _ssr_callback(self, heating_ratio):
+        device = self._get_device(self.ssr_name)
         try:
-            log.debug('{0} reports heating time of {1} seconds'.format(self.name, heating_time))
+            log.debug('{0} reports heating ratio of {1} percent'.format(self.name, heating_ratio))
             if self.start_hold_timer is None:
                 work = 'Reaching temperature {:.2f}'.format(self.current_set_temperature)
                 remaining = 'Unknown'
@@ -218,13 +219,13 @@ class TemperatureWorker(DeviceWorker):
                 remaining = (self._calculate_finish_time() - datetime.now())
             measurement = self._create_measurement(
                 self.name,
-                self._get_device(self.ssr_name).name,
-                heating_time,
+                self.device.name,
+                heating_ratio,
                 self.current_hold_time,
                 work,
                 remaining
             )
-            self._ssr_callback_event(heating_time, measurement)
+            self._ssr_callback_event(heating_ratio, measurement)
             self._send_measurement(measurement)
         except Exception as e:
             log.error('TemperatureWorker unable to react to heating update, shutting down: {0}'.format(e.args[0]))
@@ -233,7 +234,7 @@ class TemperatureWorker(DeviceWorker):
     def _setup_prometheus(self):
         try:
             labels = ['name', "device_name", 'device_type']
-            TemperatureWorker.PROM_HEATING_TIME = Gauge('HEATING_TIME', 'Heating time', labels)
+            TemperatureWorker.PROM_HEATING_RATIO = Gauge('HEATING_RATIO', 'Heating ratio', labels)
             TemperatureWorker.PROM_TEMPERATURE = Gauge('TEMPERATURE', 'Temperature', labels)
         except ValueError:
             pass  # It is already defined
@@ -241,8 +242,8 @@ class TemperatureWorker(DeviceWorker):
     def _send_measurement(self, worker_measurement):
         log.info('Send measurement triggered')
         if worker_measurement.get('device_name', '') == os.environ.get(self.SSR_NAME):
-            TemperatureWorker.PROM_HEATING_TIME.labels(self.name, self.ssr_name, 'SSR').set(worker_measurement.get('value', -1))
-            log.info('Sending heating time to Prometheus')
+            TemperatureWorker.PROM_HEATING_RATIO.labels(self.name, self.ssr_name, 'SSR').set(worker_measurement.get('value', -1))
+            log.info('Sending heating ratio to Prometheus')
         elif worker_measurement.get('device_name', '') == os.environ.get(self.THERMOMETER_NAME):
             TemperatureWorker.PROM_TEMPERATURE.labels(self.name, self.thermometer_name, 'Thermometer').set(worker_measurement.get('value', -1))
             log.info('Sending temperature to Prometheus')

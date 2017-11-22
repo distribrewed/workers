@@ -27,10 +27,14 @@ class SSR(Device):
         #log.debug(self.io[:23]+"direction")
 
         try:
-            fo = open(self.io[:16]+"export", mode='w')
+            export_file = self.io[:16]+"export"
+            log.info(export_file)
+            fo = open(export_file, mode='w')
             fo.write(gpio_numb)
             fo.close()
-            fo = open(self.io[:23]+"direction", mode='w')
+            direction_file = self.io[:23]+"direction"
+            log.info(direction_file)
+            fo = open(direction_file, mode='w')
             fo.write("out")
             fo.close()
             return True
@@ -74,7 +78,7 @@ class SSR(Device):
         if self.on_percent < 1.0:
             self.set_ssr_state(False)
             time.sleep((1.0-on_percent)*(float)(self.cycle_time))
-        self.do_callback(on_time)
+        self.do_callback(on_percent * 100.0)
 
 class SimulationSSR(SSR):
     def __init__(self, name, io, active, cycle_time, callback, owner = None):
