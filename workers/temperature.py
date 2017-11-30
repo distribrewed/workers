@@ -82,13 +82,6 @@ class TemperatureWorker(DeviceWorker):
     def _create_thermometer(self, name, io, active, cycle_time, callback):
         return Probe(name, io, active, cycle_time, callback, self)
 
-    def _info(self):
-        return {
-            'schedule_id': self.schedule_id,
-            'is_running': self.working,
-            'is_paused': self.paused,
-        }
-
     def _check_events(self):
         # The schedule ping this every 5 seconds
         pass
@@ -219,7 +212,7 @@ class TemperatureWorker(DeviceWorker):
                 remaining = (self._calculate_finish_time() - datetime.now())
             measurement = self._create_measurement(
                 self.name,
-                self.device.name,
+                device.name,
                 heating_ratio,
                 self.current_hold_time,
                 work,
