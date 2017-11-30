@@ -251,7 +251,7 @@ class TemperatureWorker(DeviceWorker):
         # 2. View panel json i.e. https://imgur.com/HcsW9sf
         # 3. Paste JSON and convert to python dict
         # This example only has 1 row with 1 panel
-        return [
+        panels = [
             {
                 "panels": [
                     {
@@ -301,7 +301,7 @@ class TemperatureWorker(DeviceWorker):
                                 "step": 1
                             },
                             {
-                                "expr": "HEATING_TIME{name=\"" + self.name + "\"}",
+                                "expr": "HEATING_RATIO{name=\"" + self.name + "\"}",
                                 "format": "time_series",
                                 "instant": False,
                                 "intervalFactor": 2,
@@ -350,3 +350,4 @@ class TemperatureWorker(DeviceWorker):
                 ]
             }
         ]
+        return panels

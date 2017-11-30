@@ -97,7 +97,7 @@ class SimulationSSR(SSR):
         on_percent = self.on_percent
         on_time = on_percent * (float)(self.cycle_time)
         time.sleep(DEVICE_DEBUG_CYCLE_TIME)
-        self.do_callback(on_time)
+        self.do_callback(on_percent * 100.0)
         return
 
     def set_ssr_state(self, on = False):

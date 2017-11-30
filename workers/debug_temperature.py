@@ -44,14 +44,16 @@ class DebugTemperatureWorker(TemperatureWorker):
     def _temperature_callback_event(self, measured_value, measurement):
         self.debug_timer += timedelta(seconds=self.DEBUG_TIMEDELTA)
 
-    def _ssr_callback_event(self, measured_value, measurement):
+    def _ssr_callback_event(self, heating_ratio, measurement):
         measurement["debug_timer"] = self.debug_timer
         try:
+            cycle_time = (float)(self._get_device(self.ssr_name).cycle_time)
+            hold_time = (heating_ratio/100.0) * cycle_time
             self._get_device(self.thermometer_name).test_temperature = \
                 PID.calc_heating(self.current_temperature,
                                  self.DEBUG_WATTS,
-                                 measured_value,
-                                 (float)(self._get_device(self.ssr_name).cycle_time),
+                                 hold_time,
+                                 cycle_time,
                                  self.DEBUG_LITERS,
                                  self.DEBUG_COOLING,
                                  self.DEBUG_DELAY,
