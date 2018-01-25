@@ -7,7 +7,7 @@ from workers.devices.device import Device, DEVICE_DEBUG_CYCLE_TIME
 log = logging.getLogger(__name__)
 
 
-class Probe(Device):
+class Tilt(Device):
     def __init__(self, name, io, active, cycle_time, callback, owner=None):
         Device.__init__(self, name, io, active, cycle_time, callback, owner)
         self.test_temperature = 0.0
@@ -17,7 +17,7 @@ class Probe(Device):
 
     def register(self):
         log.error(
-            "Can not register probe at \"{0}\"".format(
+            "Can not register tilt sensor at \"{0}\"".format(
                 self.io))
 
     def write(self, value):
@@ -42,9 +42,9 @@ class Probe(Device):
         time.sleep(self.cycle_time)
 
 
-class SimulationProbe(Probe):
+class SimulationTilt(Tilt):
     def __init__(self, name, io, active, cycle_time, callback, owner=None):
-        Probe.__init__(self, name, io, active, cycle_time, callback, owner)
+        Tilt.__init__(self, name, io, active, cycle_time, callback, owner)
 
     def register(self):
         return True

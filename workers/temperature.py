@@ -259,7 +259,7 @@ class TemperatureWorker(DeviceWorker):
                         "bars": False,
                         "dashLength": 10,
                         "dashes": False,
-                        "datasource": None,
+                        "datasource": "Distribrewed",
                         "fill": 1,
                         "id": 1,
                         "legend": {
@@ -338,7 +338,7 @@ class TemperatureWorker(DeviceWorker):
                             },
                             {
                                 "decimals": None,
-                                "format": "percentunit",
+                                "format": "percent",
                                 "label": "",
                                 "logBase": 1,
                                 "max": None,

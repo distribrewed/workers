@@ -3,6 +3,8 @@ FROM distribrewed/core:x64
 ENV ROOT_DIR=/opt/project
 ENV PLUGIN_DIR=${ROOT_DIR}/workers
 
+RUN apk update && apk add bluez-dev && apk add bluez-libs && apk add build-base
+
 COPY requirements.txt ${TMP_DIR}/requirements.txt
 RUN pip install -r ${TMP_DIR}/requirements.txt && rm -rf ${TMP_DIR}/*
 
