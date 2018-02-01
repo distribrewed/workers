@@ -1,6 +1,8 @@
-FROM distribrewed/core:arm
+#FROM distribrewed/core:arm
+FROM distribrewed/core:x64
 
-ENV ROOT_DIR=/usr/project
+#ENV ROOT_DIR=/usr/project
+ENV ROOT_DIR=/opt/project
 ENV PLUGIN_DIR=${ROOT_DIR}/workers
 
 COPY requirements.txt ${TMP_DIR}/requirements.txt
